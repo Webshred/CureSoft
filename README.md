@@ -20,7 +20,7 @@ JWT <br>
 
 ```sh
 1. Clone the Repository
-git clone https://github.com/Webshred/CureSoft.git
+git clone https://github.com/Webshred/CureSofts.git
 cd MedicalSoftware
 
 2. Install frontend dependencies
