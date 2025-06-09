@@ -107,15 +107,14 @@ const FinancialTracking = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Finance Overview" description="Track your income, expenses, and payments." />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card><CardHeader><CardTitle>Income</CardTitle><CardDescription>Total earned</CardDescription></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-green-600">${totalIncome.toFixed(2)}</p></CardContent></Card>
+          <CardContent><p className="text-2xl font-bold text-green-600">{totalIncome.toFixed(2)} Rs</p></CardContent></Card>
         <Card><CardHeader><CardTitle>Expenses</CardTitle><CardDescription>Total spent</CardDescription></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</p></CardContent></Card>
+          <CardContent><p className="text-2xl font-bold text-red-600">{totalExpenses.toFixed(2)} Rs</p></CardContent></Card>
         <Card><CardHeader><CardTitle>Net</CardTitle><CardDescription>Balance</CardDescription></CardHeader>
-          <CardContent><p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>${balance.toFixed(2)}</p></CardContent></Card>
+          <CardContent><p className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>{balance.toFixed(2)} Rs</p></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -128,7 +127,7 @@ const FinancialTracking = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis />
-                  <Tooltip formatter={(v) => [`$${v}`, '']} />
+                  <Tooltip formatter={(v) => [`${v}`, '']} />
                   <Bar name="Income" dataKey="income" fill="#4ade80" radius={[4, 4, 0, 0]} />
                   <Bar name="Expenses" dataKey="expenses" fill="#f87171" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -157,7 +156,7 @@ const FinancialTracking = () => {
                     <p className="text-muted-foreground text-sm mt-1">{t.description}</p>
                   </div>
                   <div className="font-semibold text-right text-sm">
-                    <span className={t.type === 'income' ? 'text-green-600' : 'text-red-600'}>${t.amount.toFixed(2)}</span>
+                    <span className={t.type === 'income' ? 'text-green-600' : 'text-red-600'}>{t.amount.toFixed(2)}</span>
                   </div>
                 </div>
               )) : <p className="text-center text-muted-foreground py-8">No transactions found</p>}
@@ -194,9 +193,9 @@ const FinancialTracking = () => {
 
               <FormField name="amount" control={form.control} render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount ($)</FormLabel>
+                  <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input type="number" step="1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

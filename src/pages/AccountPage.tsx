@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PageLayout from '../components/layout/PageLayout';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Pencil } from 'lucide-react';
-import { EditableField } from '@/components/ui/editable-field';
 
 interface UserProfile {
   firstName: string;
@@ -17,176 +14,151 @@ interface UserProfile {
 }
 
 const AccountPage = () => {
-  const { currentUser, updateProfilePic, logout, updateUserInfo } = useAuthContext();
-  
+  const { logout } = useAuthContext();
   const [profile, setProfile] = useState<UserProfile>({
-    firstName: currentUser?.firstName || '',
-    lastName: currentUser?.lastName || '',
-    email: currentUser?.email || '',
-    phone: currentUser?.phone || '',
-    address: currentUser?.address || ''
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
   });
-  
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    
-    if (!file) return;
-    
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("L'image est trop volumineuse (max 5MB)");
-      return;
-    }
-    
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      toast.error("Seules les images sont acceptées");
-      return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        updateProfilePic(event.target.result.toString());
-        toast.success("Photo de profil mise à jour");
+
+  // Fetch user profile on mount
+ useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/account/me', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (res.ok) {
+        const user = await res.json();
+        setProfile({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          address: user.address || '',
+        });
+      } else {
+        console.error('Failed to fetch user profile');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+    }
+  };
+
+  fetchProfile();
+}, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProfile(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/account/update', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(profile),
+      });
+
+      if (res.ok) {
+        const updatedUser = await res.json();
+        setProfile(updatedUser.user);
+        toast.success('Profile updated successfully');
+      } else {
+        toast.error('Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      toast.error('Something went wrong');
+    }
   };
 
   const handleLogout = () => {
     logout();
-    toast.success('Vous avez été déconnecté');
-  };
-
-  const handleProfileUpdate = (field: keyof UserProfile, value: string) => {
-    setProfile(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    if (updateUserInfo) {
-      updateUserInfo({ [field]: value });
-      toast.success(`${field} mis à jour avec succès`);
-    }
+    toast.success('You have been logged out');
   };
 
   return (
     <PageLayout>
       <div className="max-w-4xl mx-auto p-6">
         <h1 className="text-2xl font-semibold mb-6 text-gray-800">My Profile</h1>
-        
-        {/* Profile Card */}
+
         <Card className="mb-6 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="relative">
-                <Avatar className="h-16 w-16">
-                  {currentUser?.profilePic ? (
-                    <AvatarImage src={currentUser.profilePic} alt={currentUser?.username || ''} />
-                  ) : (
-                    <AvatarFallback className="text-lg">
-                      {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <label 
-                  htmlFor="profile-pic" 
-                  className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 border border-gray-300 cursor-pointer hover:bg-gray-100"
-                >
-                  <Pencil className="h-3 w-3" />
-                  <span className="sr-only">Change profile picture</span>
-                </label>
-                <input 
-                  type="file" 
-                  id="profile-pic" 
-                  className="hidden" 
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                />
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-medium text-gray-800">{profile.firstName} {profile.lastName}</h2>
-                    <p className="text-gray-500 text-sm">{profile.address}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Personal Information */}
-        <Card className="mb-6 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Personal information</CardTitle>
+          <CardHeader>
+            <CardTitle className="text-lg">Personal Information</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-2 gap-y-4 gap-x-6">
-              <div>
-                <p className="text-sm font-normal text-gray-500 mb-1">First Name</p>
-                <EditableField 
-                  value={profile.firstName}
-                  onSave={(value) => handleProfileUpdate('firstName', String(value))}
-                  showEditIcon={true}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-normal text-gray-500 mb-1">Last Name</p>
-                <EditableField 
-                  value={profile.lastName}
-                  onSave={(value) => handleProfileUpdate('lastName', String(value))}
-                  showEditIcon={true}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-normal text-gray-500 mb-1">Email address</p>
-                <EditableField 
-                  value={profile.email}
-                  onSave={(value) => handleProfileUpdate('email', String(value))}
-                  showEditIcon={true}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-normal text-gray-500 mb-1">Phone</p>
-                <EditableField 
-                  value={profile.phone}
-                  onSave={(value) => handleProfileUpdate('phone', String(value))}
-                  showEditIcon={true}
-                />
-              </div>
+          <CardContent className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">First Name</label>
+              <input
+                type="text"
+                name="firstName"
+                value={profile.firstName}
+                onChange={handleInputChange}
+                className="mt-1 w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Last Name</label>
+              <input
+                type="text"
+                name="lastName"
+                value={profile.lastName}
+                onChange={handleInputChange}
+                className="mt-1 w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={profile.email}
+                onChange={handleInputChange}
+                className="mt-1 w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Phone</label>
+              <input
+                type="text"
+                name="phone"
+                value={profile.phone}
+                onChange={handleInputChange}
+                className="mt-1 w-full p-2 border rounded"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium text-gray-700">Address</label>
+              <input
+                type="text"
+                name="address"
+                value={profile.address}
+                onChange={handleInputChange}
+                className="mt-1 w-full p-2 border rounded"
+              />
             </div>
           </CardContent>
         </Card>
-        
-        {/* Address Information */}
-        <Card className="mb-6 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Address</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-2 gap-y-4 gap-x-6">
-              <div>
-                <p className="text-sm font-normal text-gray-500 mb-1">Address</p>
-                <EditableField 
-                  value={profile.address}
-                  onSave={(value) => handleProfileUpdate('address', String(value))}
-                  showEditIcon={true}
-                />
-              </div>
-              <div>
-                
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Logout Button */}
-        <div className="mt-8">
+
+        <div className="mt-8 flex flex-col sm:flex-row gap-4">
+          <Button onClick={handleUpdateProfile} className="w-full sm:w-auto">
+            Update Profile
+          </Button>
           <Button onClick={handleLogout} variant="destructive" className="w-full sm:w-auto">
-            log Out
+            Log Out
           </Button>
         </div>
       </div>

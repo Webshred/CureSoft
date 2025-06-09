@@ -14,6 +14,6 @@ const createUser = async (email, password, role = 'user') => {
   console.log(`User created: ${email} (${role})`);
 };
 
-await createUser('admin@example.com', 'admin123', 'admin');
-await createUser('user@example.com', 'user123', 'user');
+await createUser('kawish@gmail.com', 'admin123', 'admin');
+await createUser('adnan@gmail.com', 'user123', 'user');
 process.exit();

@@ -10,6 +10,7 @@ import financeRoutes from './routes/finance.js';
 import billingRoutes from './routes/billing.js';
 import employeeRoutes from './routes/employee.js';
 import attendanceRoutes from './routes/attendance.js';
+import accountRoutes from './routes/account.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/account', accountRoutes);
 
 
 

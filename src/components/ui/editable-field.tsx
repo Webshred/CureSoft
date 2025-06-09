@@ -25,7 +25,7 @@ export const EditableField = ({
   onClick,
   options = [],
   icon,
-  showEditIcon = false
+  showEditIcon = true
 }: EditableFieldProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value);

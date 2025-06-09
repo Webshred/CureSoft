@@ -1,6 +1,7 @@
 // backend/routes/employee.js
 import express from 'express';
 import Employee from '../models/employee.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -43,13 +44,22 @@ router.put('/:id', getEmployee, async (req, res) => {
   }
 });
 
-// Delete an employee
-router.delete('/:id', getEmployee, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    await res.employee.remove();
-    res.json({ message: 'Deleted Employee' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid employee ID' });
+    }
+
+    const deleted = await Employee.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    res.status(200).json({ message: 'Employee deleted' });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ message: 'Server error while deleting employee' });
   }
 });
 

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Printer, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { getInventoryAlertStatusMap } from './Inventory.tsx';
 
 interface BillItem {
   id: string;
@@ -24,6 +25,14 @@ interface InventoryItem {
   category?: string;
 }
 
+interface UserData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
 const Billing = () => {
   const [patientName, setPatientName] = useState('');
   const [billerName, setBillerName] = useState('');
@@ -32,19 +41,32 @@ const Billing = () => {
   const [suggestions, setSuggestions] = useState<InventoryItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionBox = useRef<HTMLDivElement>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [alertStatusMap, setAlertStatusMap] = useState<Record<string, 'normal' | 'warning' | 'critical'>>({});
 
   useEffect(() => {
-    const fetchUserDetails = async () => {
-    try {
-      const res = await axios.get('');
-      // setCurrentUser(res.data);
-      // setBillerName(`${res.data.firstName} ${res.data.lastName}`);
-    } catch (err) {
-      console.error('Failed to load user account info:', err);
-    }
-  };
-  fetchUserDetails();
-  
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/account/me', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setUserData(data);
+          setBillerName(`${data.firstName} ${data.lastName}`);
+        } else {
+          console.error('Failed to fetch user info');
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
+      }
+    };
+
+    fetchUser();
+
     const clickOutside = (e: MouseEvent) => {
       if (suggestionBox.current && !suggestionBox.current.contains(e.target as Node)) {
         setShowSuggestions(false);
@@ -52,6 +74,19 @@ const Billing = () => {
     };
     document.addEventListener('mousedown', clickOutside);
     return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const res = await axios.get('/api/inventory');
+        const inventory = res.data;
+        setAlertStatusMap(getInventoryAlertStatusMap(inventory));
+      } catch (err) {
+        console.error('Error fetching inventory:', err);
+      }
+    };
+    fetchInventory();
   }, []);
 
   const handleItemNameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,8 +111,13 @@ const Billing = () => {
   };
 
   const addItem = () => {
+    const alertStatus = alertStatusMap[newItem.name];
+    if (alertStatus === 'critical') {
+      toast.error('This item is critically low or out of stock.');
+      return;
+    }
     if (!newItem.name || newItem.quantity <= 0 || newItem.unitPrice <= 0) {
-      toast.error("Fill in all fields correctly.");
+      toast.error('Fill in all fields correctly.');
       return;
     }
     setBillItems([...billItems, { ...newItem, id: Date.now().toString() }]);
@@ -91,45 +131,64 @@ const Billing = () => {
   const calculateTotal = () => billItems.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
   const generateReceiptHTML = () => {
-    const date = new Date();
-    return `
-       <div style="font-family:monospace; width:280px; margin:auto; font-size:12px;">
-      <div style="text-align:center;">
-        <strong>The Aga Khan University Hospital</strong><br/>
-        Behind Indus Valley School of Art & Architecture<br/>
-        Off Shara-e-Saadi, St. 11, Block No. 2<br/>
-        Clifton, Karachi<br/>
-        Tel: +92 21 111-911-911
+  const date = new Date();
+  return `
+    <div style="font-family:monospace; width:280px; margin:auto; font-size:12px;">
+      <div style="text-align:center; font-weight:bold; font-size:14px;">
+        <div style="font-size:16px; margin-bottom:4px;">'MEDICAL NAME' </div>
+        ${userData?.address || '123 Health St., Wellness City'}<br/>
+        ${userData?.phone || '123-456-7890'}
+      </div>
+
+      <div>
+        Biller Name: ${billerName}<br/>
+        Patient Name: ${patientName}<br/>
+        Date: ${date.toLocaleDateString()}<br/>
+        Time: ${date.toLocaleTimeString()}<br/>
+      </div>
+
+      <hr/>
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead style="text-align:left; border-bottom:1px solid #000;">
+          <tr>
+            <th>#</th>
+            <th>Item</th>
+            <th style="text-align:right;">Qty</th>
+            <th style="text-align:right;">Price</th>
+            <th style="text-align:right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${billItems.map((item, idx) => {
+            const total = item.quantity * item.unitPrice;
+            return `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${item.name.slice(0, 16)}</td>
+                <td style="text-align:right;">${item.quantity}</td>
+                <td style="text-align:right;">${item.unitPrice.toFixed(2)}</td>
+                <td style="text-align:right;">${total.toFixed(2)}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <hr/>
+      <div style="text-align:right;">
+        <strong>Subtotal:</strong> ${calculateTotal().toFixed(2)} Rs<br/>
+        <strong>Grand Total:</strong> ${(calculateTotal() * 1.05).toFixed(2)} Rs
       </div>
       <hr/>
-      Patient: ${patientName}<br/>
-      Address: Karachi <br/>
-      Cell: 0987654321 <br/>
-      Biller: ${billerName}<br/>
-      Date: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}<br/>
-      ----------------------------------------<br/>
-      Item                 Qty  Price   Total<br/>
-      ----------------------------------------<br/>
-      ${billItems.map(i => {
-        const name = i.name.slice(0, 18).padEnd(18);
-        const qty = String(i.quantity).padStart(3);
-        const price = i.unitPrice.toFixed(0).padStart(6);
-        const total = (i.quantity * i.unitPrice).toFixed(0).padStart(7);
-        return `${name}${qty} ${price} ${total}`;
-      }).join('<br/>')}
-      <br/>----------------------------------------<br/>
-      TOTAL: ${calculateTotal().toFixed(0).padStart(25)} PKR<br/>
-      ----------------------------------------<br/>
-      Remarks: Care of Emmad Uddin<br/><br/>
-      * Drugs once dispensed are not returnable.<br/>
-      * Collected within 2 weeks only.<br/>
-      * Dispensed at approved prices.<br/><br/>
-      Info: 021-34861504 / 1506<br/>
-      Email: drug.information@aku.edu<br/>
-      Printed: ${date.toLocaleString()}
+
+      <div style="margin-top:8px; text-align:center;">
+        ${userData?.phone}<br/>
+        ${userData?.address}<br/>
+        <strong>Thank you for choosing 'MEDICAL NAME' !</strong><br/>
+        We care for your health.
+      </div>
     </div>
-    `;
-  };
+  `;
+};
+
 
   const printReceipt = () => {
     const w = window.open('', '_blank');
@@ -142,7 +201,7 @@ const Billing = () => {
 
   const handlePrint = async () => {
     if (!patientName || !billerName || billItems.length === 0) {
-      toast.error("Complete all fields.");
+      toast.error('Complete all fields.');
       return;
     }
     try {
@@ -151,13 +210,13 @@ const Billing = () => {
         totalAmount: calculateTotal()
       });
       printReceipt();
-      toast.success("Invoice processed.");
+      toast.success('Invoice processed.');
       setPatientName('');
       setBillerName('');
       setBillItems([]);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to process billing.");
+      toast.error('Failed to process billing.');
     }
   };
 
@@ -173,11 +232,10 @@ const Billing = () => {
             </div>
             <div className="space-y-2">
               <Label>Biller Name</Label>
-              <Input value={billerName} onChange={e => setBillerName(e.target.value)} />
+              <Input value={billerName} readOnly />
             </div>
           </div>
 
-          {/* Input Fields and Suggestions */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 relative z-50">
             <div className="relative">
               <Label>Item Name</Label>
@@ -192,18 +250,28 @@ const Billing = () => {
                   ref={suggestionBox}
                   className="absolute z-50 w-full bg-white border rounded shadow max-h-60 overflow-y-auto"
                 >
-                  {suggestions.map((item) => (
-                    <div
-                      key={item._id}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                      onClick={() => selectSuggestion(item)}
-                    >
-                      <div className="font-medium">{item.name}</div>
-                      <div className="text-sm text-gray-500">
-                        ${item.price.toFixed(2)} — {item.quantity} {item.unit}
+                  {suggestions.map((item) => {
+                    const alert = alertStatusMap[item.name];
+                    const bgColor =
+                      alert === 'critical'
+                        ? 'bg-red-100'
+                        : alert === 'warning'
+                        ? 'bg-yellow-100'
+                        : '';
+
+                    return (
+                      <div
+                        key={item._id}
+                        className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${bgColor}`}
+                        onClick={() => selectSuggestion(item)}
+                      >
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-gray-500">
+                          ${item.price.toFixed(2)} — {item.quantity} {item.unit}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -225,7 +293,7 @@ const Billing = () => {
               <Input
                 type="number"
                 min="0"
-                step="0.01"
+                step="1"
                 value={newItem.unitPrice}
                 onChange={(e) =>
                   setNewItem({ ...newItem, unitPrice: parseFloat(e.target.value) || 0 })
@@ -271,7 +339,7 @@ const Billing = () => {
           </div>
         </CardContent>
         <CardFooter className="flex justify-between border-t p-4">
-          <div className="text-xl font-semibold">Total: {calculateTotal().toFixed(2)} $</div>
+          <div className="text-xl font-semibold">Total: {calculateTotal().toFixed(2)} RS</div>
           <Button onClick={handlePrint} disabled={billItems.length === 0 || !patientName || !billerName}>
             <Printer className="mr-2 h-4 w-4" /> Print Invoice
           </Button>

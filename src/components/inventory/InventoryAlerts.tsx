@@ -44,7 +44,7 @@ const InventoryAlerts: React.FC<InventoryAlertsProps> = ({ alerts, onQuantityCha
                     : 'bg-agri-warning/10 text-agri-warning'
                 }`}
               >
-                {alert.status === 'critical' ? 'Critique' : 'Attention'}
+                {alert.status === 'critical' ? 'critical' : 'Attention'}
               </span>
             </div>
             <div className="mt-2 text-sm">

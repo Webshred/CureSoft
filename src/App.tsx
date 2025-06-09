@@ -1,6 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import InventoryPage from "./pages/InventoryPage";
 import FinancePage from "./pages/FinancePage";
@@ -61,7 +61,6 @@ const App = () => {
   if (role === 'user') {
     return (
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
           <TooltipProvider>
             <Routes>
               <Route path="/facturation" element={<BillingPage />} />
@@ -71,14 +70,12 @@ const App = () => {
             </Routes>
             <Toaster />
           </TooltipProvider>
-        </BrowserRouter>
       </QueryClientProvider>
     );
   }
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
         <RouterChangeHandler>
           <AppSettingsProvider>
             <AuthProvider>
@@ -103,7 +100,6 @@ const App = () => {
             </AuthProvider>
           </AppSettingsProvider>
         </RouterChangeHandler>
-      </BrowserRouter>
     </QueryClientProvider>
   );
 };

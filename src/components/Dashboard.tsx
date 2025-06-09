@@ -43,8 +43,28 @@ const StatCard = ({
 );
 
 const Dashboard = () => {
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [latest, setLatest] = useState<MetricData | null>(null);
+
+  const fetchTransactions = async () => { 
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No auth token found');
+      const res = await axios.get('/api/finance', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setTransactions(res.data);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -69,9 +89,19 @@ const Dashboard = () => {
     fetchMetrics();
   }, []);
 
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const balance = totalIncome - totalExpenses;
+
+  const monthlyIncomeData = Array.from({ length: 12 }, (_, i) => {
+    const month = new Date(0, i).toLocaleString('default', { month: 'short' });
+    const income = transactions.filter(t => new Date(t.date).getMonth() === i && t.type === 'income')
+                                .reduce((sum, t) => sum + t.amount, 0);
+    return { month, income };
+  });
+
   return (
     <div className="p-6 space-y-6 animate-enter">
-      {/* Header */}
       <header className="flex justify-between items-center mb-6 bg-gray-100 p-4 rounded-lg shadow-sm">
         <div>
           <h1 className="text-2xl font-bold mb-1">Hello, RWS User</h1>
@@ -79,12 +109,11 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           label="Monthly Income"
-          value={`$${latest?.income ?? 0}`}
-          change={`+${((latest?.income ?? 0) / 100).toFixed(1)}%`}
+          value={`${balance.toFixed(2)} RS`}
+          change={`+${((balance / 100) || 0).toFixed(1)}%`}
         />
         <StatCard
           label="Production"
@@ -93,47 +122,42 @@ const Dashboard = () => {
           color="text-agri-primary"
         />
         <StatCard
-          label="Sales"
-          value={latest?.sales ?? 0}
-          change={`+${((latest?.sales ?? 0) / 100).toFixed(1)}%`}
-        />
-        <StatCard
           label="Efficiency"
           value={`${latest?.efficiency ?? 0}%`}
-          change={`+${((latest?.efficiency ?? 0) / 100).toFixed(1)}%`}
+          change={`+ ${((latest?.efficiency ?? 0) / 100).toFixed(1)}%`}
+        />
+        <StatCard
+          label="Transactions"
+          value={transactions.length}
+          change="All time"
+          color="text-blue-600"
         />
       </div>
 
-      {/* Income Chart */}
       <div className="dashboard-card col-span-full card-hover">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-semibold">Monthly Income</h3>
+          <h3 className="font-semibold">Monthly Income Overview</h3>
           <button className="text-xs px-3 py-1.5 bg-muted rounded-md text-foreground">2025</button>
         </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={metrics.map(m => ({
-                month: new Date(m.date).toLocaleDateString('en-US', { month: 'short' }),
-                revenue: m.income
-              }))}
-            >
+            <AreaChart data={monthlyIncomeData}>
               <defs>
-                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#4CAF50" stopOpacity={0.8} />
                   <stop offset="95%" stopColor="#4CAF50" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
               <XAxis dataKey="month" axisLine={false} tickLine={false} />
-              <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
-              <Tooltip formatter={(v) => [`$${v}`, 'Income']} />
+              <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} />
+              <Tooltip formatter={(v) => [`${v}`, 'Income']} />
               <Area
                 type="monotone"
-                dataKey="revenue"
+                dataKey="income"
                 stroke="#4CAF50"
                 fillOpacity={1}
-                fill="url(#colorRevenue)"
+                fill="url(#colorIncome)"
                 activeDot={{ r: 6 }}
               />
             </AreaChart>

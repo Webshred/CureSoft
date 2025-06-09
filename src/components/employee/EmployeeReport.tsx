@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -7,10 +7,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Printer, FileText } from 'lucide-react';
-import { Employee, EmployeeAttendance, EmployeeReport as EmployeeReportType } from '@/types/employee';
+import {
+  Employee,
+  EmployeeAttendance,
+  EmployeeReport as EmployeeReportType
+} from '@/types/employee';
 
 interface EmployeeReportProps {
   employees: Employee[];
@@ -31,16 +41,24 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
   const [reportGenerated, setReportGenerated] = useState(false);
   const [reportData, setReportData] = useState<EmployeeReportType | null>(null);
 
+  const normalizedEmployees = employees.map(emp => ({
+    ...emp,
+    id: emp.id || (typeof emp._id === 'string' ? emp._id : emp._id?.toString())
+  }));
+
   const months = [...Array(12).keys()].map(i => ({
     value: i.toString(),
     label: new Date(0, i).toLocaleString('en', { month: 'long' })
   }));
 
   const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear - 1, currentYear - 2].map(y => ({ value: y.toString(), label: y.toString() }));
+  const years = [currentYear, currentYear - 1, currentYear - 2].map(y => ({
+    value: y.toString(),
+    label: y.toString()
+  }));
 
   const generateReport = () => {
-    const employee = employees.find(e => e.id === selectedEmployeeId);
+    const employee = normalizedEmployees.find(e => e.id === selectedEmployeeId);
     if (!employee) return;
 
     const month = parseInt(selectedMonth);
@@ -62,27 +80,35 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
       return acc;
     }, {});
 
-    const attendanceRecords = Object.entries(attendancesByDate).map(([date, records]) => {
-      records.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const attendanceRecords = Array.from({ length: 30 }, (_, index) => {
+      const day = index + 1;
+      const dateObj = new Date(year, month, day);
+      const dateStr = dateObj.toISOString().split('T')[0];
+      const records = attendancesByDate[dateStr] || [];
+
       const checkIn = records.find(r => r.activityType === 'check-in');
       const checkOut = records.find(r => r.activityType === 'check-out');
-      const isLate = checkIn?.status === 'late';
+      const leave = records.find(r => r.activityType === 'leave');
 
       return {
-        date,
-        checkIn: checkIn ? new Date(checkIn.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
-        checkOut: checkOut ? new Date(checkOut.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : undefined,
-        isLate
+        day: dateObj.toLocaleString('en', { weekday: 'short' }),
+        date: dateObj.toLocaleDateString(),
+        checkIn: checkIn ? new Date(checkIn.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-',
+        checkOut: checkOut ? new Date(checkOut.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '-',
+        leave: !!leave,
+        status: leave ? 'Leave' : checkIn ? (checkIn.status === 'late' ? 'Late' : 'On Time') : 'Absent'
       };
     });
 
-    const leaveCount = filteredAttendances.filter(a => a.activityType === 'leave').length;
-    const lateCount = attendanceRecords.filter(r => r.isLate).length;
+    const leaveCount = attendanceRecords.filter(a => a.leave).length;
+    const lateCount = attendanceRecords.filter(r => r.status === 'Late').length;
+    const daysPresent = attendanceRecords.filter(r => r.status === 'On Time' || r.status === 'Late').length;
 
     setReportData({
       employeeId: employee.id,
       name: employee.name,
-      daysPresent: attendanceRecords.length,
+      daysPresent,
       attendances: attendanceRecords,
       leaveCount,
       lateCount
@@ -91,13 +117,7 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
   };
 
   const handlePrint = () => {
-    if (!reportData) return;
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(`<pre>${JSON.stringify(reportData, null, 2)}</pre>`);
-      win.document.close();
-      win.print();
-    }
+    window.print();
   };
 
   const resetReport = () => {
@@ -107,7 +127,7 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Monthly Attendance Report</DialogTitle>
         </DialogHeader>
@@ -121,10 +141,8 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.name}
-                    </SelectItem>
+                  {normalizedEmployees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -162,69 +180,57 @@ const EmployeeReport: React.FC<EmployeeReportProps> = ({
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={generateReport} disabled={!selectedEmployeeId}>
-                <FileText className="mr-2 h-4 w-4" />
-                Generate
+                <FileText className="mr-2 h-4 w-4" /> Generate
               </Button>
             </DialogFooter>
           </div>
         ) : (
-          <>
-            <div className="mb-4">
-              <h2 className="text-xl font-bold">{reportData?.name}</h2>
-              <p className="text-sm text-gray-500">{months[+selectedMonth].label} {selectedYear}</p>
-            </div>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="p-4 bg-blue-100 rounded-md">
-                <p className="text-sm">Days Present</p>
-                <p className="text-2xl font-bold">{reportData?.daysPresent}</p>
-              </div>
-              <div className="p-4 bg-red-100 rounded-md">
-                <p className="text-sm">Late Arrivals</p>
-                <p className="text-2xl font-bold">{reportData?.lateCount}</p>
-              </div>
-              <div className="p-4 bg-yellow-100 rounded-md">
-                <p className="text-sm">Days Off</p>
-                <p className="text-2xl font-bold">{reportData?.leaveCount}</p>
-              </div>
-            </div>
+          <div className="p-4 print:p-0">
+            <h1 className="text-center text-2xl font-bold underline mb-4">MONTHLY REPORT</h1>
+            <h2 className="text-center text-lg font-semibold mb-2">{reportData?.name}</h2>
 
-            <div className="overflow-auto">
-              <table className="w-full border text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2 text-left">Date</th>
-                    <th className="p-2 text-left">Check-In</th>
-                    <th className="p-2 text-left">Check-Out</th>
-                    <th className="p-2 text-left">Status</th>
+            <table className="w-full border text-sm print:text-xs">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-1">Day</th>
+                  <th className="border p-1">Date</th>
+                  <th className="border p-1">Arrival</th>
+                  <th className="border p-1">Depart</th>
+                  <th className="border p-1">Leave</th>
+                  <th className="border p-1">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportData?.attendances.map((record, i) => (
+                  <tr key={i} className="text-center">
+                    <td className="border p-1">{record.day}</td>
+                    <td className="border p-1">{record.date}</td>
+                    <td className="border p-1">{record.checkIn}</td>
+                    <td className="border p-1">{record.checkOut}</td>
+                    <td className="border p-1">{record.leave ? 'Yes' : '-'}</td>
+                    <td className="border p-1">{record.status}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {reportData?.attendances.map((record, i) => (
-                    <tr key={i}>
-                      <td className="p-2">{new Date(record.date).toLocaleDateString()}</td>
-                      <td className="p-2">{record.checkIn || '-'}</td>
-                      <td className="p-2">{record.checkOut || '-'}</td>
-                      <td className="p-2">
-                        {record.isLate ? <span className="text-red-500">Late</span> : <span className="text-green-600">On Time</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="text-right mt-2 text-sm">
+              Month: {months[+selectedMonth].label} | Year: {selectedYear}
             </div>
 
-            <DialogFooter className="mt-4">
+            <DialogFooter className="mt-4 print:hidden">
               <Button variant="outline" onClick={resetReport}>Back</Button>
               <Button onClick={handlePrint} variant="secondary">
-                <Printer className="mr-2 h-4 w-4" />
-                Print
+                <Printer className="mr-2 h-4 w-4" /> Print
               </Button>
             </DialogFooter>
-          </>
+          </div>
         )}
+        
       </DialogContent>
     </Dialog>
   );
 };
+   
 
 export default EmployeeReport;
